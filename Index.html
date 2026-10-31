@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>อบรมความปลอดภัยออนไลน์</title>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@500;600&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#23262B;--paper:#FBFAF5;--line:#D9D6C8;--yel:#F2B705;--ok:#1E7F52;--bad:#B93228;--mut:#5E6068}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.7 "Noto Sans Thai",sans-serif}
+h1,h2,h3{font-family:Mitr,sans-serif;font-weight:500;line-height:1.3;margin:0 0 .5em}
+.stripe{height:14px;background:repeating-linear-gradient(-45deg,var(--yel) 0 18px,var(--ink) 18px 36px)}
+header{padding:28px 20px 8px;max-width:760px;margin:auto}
+header h1{font-size:clamp(28px,6vw,44px)}
+header p{margin:0;color:var(--mut)}
+main{max-width:760px;margin:auto;padding:12px 20px 60px}
+.card{border:2px solid var(--ink);background:#fff;padding:18px 20px;margin:14px 0;cursor:pointer;display:block;width:100%;text-align:left;font:inherit;color:inherit}
+.card:hover,.card:focus-visible{background:#FFF6D6;outline:3px solid var(--yel)}
+.card h3{margin:0 0 4px;font-size:21px}.card span{color:var(--mut);font-size:15px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 22px;padding:0;list-style:none;font-size:14px}
+.steps li{padding:2px 12px;border:1px solid var(--line);color:var(--mut)}
+.steps li.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.steps li.done{border-color:var(--ok);color:var(--ok)}
+label.f{display:block;margin:12px 0 4px;font-weight:600}
+input[type=text],input[type=password],select{font:inherit;padding:10px 12px;border:2px solid var(--ink);width:100%;max-width:420px;background:#fff}
+button.b{font:600 17px "Noto Sans Thai";background:var(--yel);color:var(--ink);border:2px solid var(--ink);padding:10px 24px;cursor:pointer;margin:18px 10px 0 0}
+button.b:hover,button.b:focus-visible{background:var(--ink);color:#fff}
+button.b:disabled{opacity:.4;cursor:not-allowed;background:var(--line);color:var(--ink)}
+button.g{background:none;border:0;color:var(--mut);text-decoration:underline;cursor:pointer;font:inherit;padding:0;margin-bottom:8px}
+.sec{margin:34px 0 0;font-size:20px}
+.q{border-left:6px solid var(--yel);padding:2px 0 2px 16px;margin:24px 0}
+.q p{margin:0 0 6px;font-weight:600}
+.q label{display:block;padding:6px 8px;cursor:pointer}
+.q label:hover{background:#FFF6D6}
+.vid{aspect-ratio:16/9;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+.vid iframe{width:100%;height:100%;border:0}
+.pts{margin:22px 0;padding:0;list-style:none}
+.pts li{padding:8px 0 8px 16px;border-left:6px solid var(--ink);margin:10px 0;background:#fff}
+.score{font:500 56px Mitr;margin:0}.pass{color:var(--ok)}.fail{color:var(--bad)}
+canvas{width:100%;height:auto;border:2px solid var(--ink);margin-top:12px}
+.note{color:var(--mut);font-size:15px}
+@media (prefers-reduced-motion:no-preference){.card{transition:background .15s}}
+main.wide{max-width:1100px}
+footer{max-width:760px;margin:auto;padding:0 20px 40px;text-align:right}
+.row{display:flex;flex-wrap:wrap;gap:10px}.row>div{flex:1 1 180px}
+.tw{overflow-x:auto;border:2px solid var(--ink);background:#fff;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:7px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--ink);color:#fff}
+.ap{color:var(--ok);font-weight:600}.af{color:var(--bad);font-weight:600}.bad{color:var(--bad)}.ok{color:var(--ok)}
+</style>
+</head>
+<body>
+<div class="stripe"></div>
+<header><h1>อบรมความปลอดภัยออนไลน์</h1><p id="sub">เลือกหลักสูตรที่ต้องการเรียน</p></header>
+<main id="app"></main>
+<footer><button class="g" id="adm">สำหรับเจ้าหน้าที่</button></footer>
+<script>
+/* ===== ตั้งค่า: แก้ตรงนี้ ===== */
+const CONFIG={
+  company:"บริษัท เซ้าท์อีสต์ทรานสปอร์ต จำกัด",
+  passPercent:80,
+  hook:"https://script.google.com/macros/s/AKfycbzcUYDTrNkCNI9FagxLpxTo7xhXCcSG-uPKGBB91FxkJTgn4jRheNXF6T4rcOvxs4YK/exec" // วาง URL ของ Apps Script (ลงท้ายด้วย /exec) ที่นี่ เพื่อเก็บผลสอบลง Google Sheet (เว้นว่าง = ไม่เก็บ)
+};
+/* ข้อสอบ: [คำถาม, ลำดับคำตอบที่ถูก (เริ่มนับที่ 0), ตัวเลือก...] เรียงตามที่เขียนไว้ ไม่สลับ
+   yt = รหัสวิดีโอ YouTube (Unlisted) ถ้าว่างจะแสดงโหมดทดลอง  sec = หัวข้อส่วนของข้อสอบ  pass = เกณฑ์ผ่านเป็น % (ถ้าไม่ใส่ใช้ CONFIG.passPercent) */
+const COURSES=[
+ {
+  "id": "truck",
+  "title": "ความปลอดภัยในการขับรถบรรทุก",
+  "desc": "ตรวจรถ ระยะห่าง ความเมื่อยล้า การใช้โทรศัพท์",
+  "min": 10,
+  "yt": "Hwzr0n2CiLY",
+  "pts": [
+   "ก่อนออกเดินทางทุกครั้ง ตรวจเบรก ไฟ ยาง ตามเช็คลิสต์ของบริษัท",
+   "ห้ามถือโทรศัพท์ขณะขับ แม้เปิดลำโพง",
+   "ง่วงให้จอดพักในที่ปลอดภัย ไม่ใช่ดื่มกาแฟแล้วขับต่อ",
+   "เว้นระยะจากรถคันหน้าให้ปลอดภัย ไม่ขับเกินความเร็วและน้ำหนักที่กฎหมายกำหนด",
+   "มองกระจกทุก 5-8 วินาที และมองแต่ละครั้งไม่เกิน 2 วินาที"
+  ],
+  "q": [
+   [
+    "หลังการเกิดอุบัติเหตุ หากเป็นเคสที่เล็กน้อยและพนักงานไม่เป็นฝ่ายผิด ไม่จำเป็นต้องมีการสอบสวนอุบัติเหตุ",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "การขับรถบรรทุกด้วยความเร็วเกินกว่าที่กฎหมายกำหนดในเขตชุมชน แม้จะเป็นช่วงเวลาที่ไม่มีผู้คนพลุกพล่าน ก็สามารถทำได้หากผู้ขับขี่มีความชำนาญ",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "ก่อนออกเดินทางทุกครั้ง พนักงานขับรถบรรทุกมีหน้าที่ต้องตรวจสอบสภาพความพร้อมของรถ ทั้งระบบเบรก ระบบไฟส่องสว่าง ยางรถยนต์ และส่วนต่าง ๆ ตามรายการเช็คลิสต์ของบริษัท",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "การบรรทุกสินค้าเกินกว่าน้ำหนักที่กฎหมายกำหนด เป็นสิ่งที่สามารถยอมรับได้ หากเป็นสินค้าที่ไม่ก่อให้เกิดอันตรายและระยะทางในการขนส่งไม่ไกลมากนัก",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "หากรู้สึกอ่อนเพลียหรือง่วงนอนเล็กน้อย การดื่มกาแฟเข้ม ๆ แล้วขับรถต่อเลย เป็นวิธีที่เหมาะสมเพื่อแก้ง่วงและเดินทางถึงที่หมายอย่างรวดเร็ว",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "หากมีความจำเป็นต้องรับสายโทรศัพท์ ให้เปิดลำโพงแล้วถือโทรศัพท์และขับรถไปได้",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "การเว้นระยะห่างจากรถคันหน้าให้น้อยกว่าระยะปลอดภัย เพื่อป้องกันไม่ให้รถคันอื่นแทรก ถือเป็นเทคนิคการขับขี่ที่ปลอดภัยบนท้องถนนที่มีการจราจรหนาแน่น",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "การปรับกระจกมองข้างและกระจกมองหลังให้เห็นมุมมองที่ชัดเจน เป็นขั้นตอนที่ไม่จำเป็น หากผู้ขับขี่คุ้นเคยกับเส้นทางอยู่แล้ว",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "เทคนิคการใช้สายตาเพื่อมองและตรวจสอบบริเวณโดยรอบตัวรถขณะขับรถบรรทุก และกระจกมองข้าง ควรมองครั้งละไม่เกิน 2 วินาที และควรมองกระจกทุก ๆ 5-8 วินาที",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "ใบอนุญาตขับรถประเภท ท.3 อนุญาตให้ผู้ขับขี่ทำการขนส่งวัตถุอันตรายได้ทุกประเภท โดยไม่ต้องมีใบอนุญาตเฉพาะเพิ่มเติม",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ]
+  ],
+  "sec": {
+   "0": "ข้อถูก/ข้อผิด อ่านข้อความแล้วเลือกว่าถูกต้องหรือไม่"
+  }
+ },
+ {
+  "id": "receiving",
+  "title": "ขั้นตอนการรับสินค้า",
+  "desc": "ตรวจเอกสาร แต่งกาย ความเร็ว จุดห้ามเข้า การคลุมผ้าใบ",
+  "min": 10,
+  "yt": "zTGfmGmbR8Q",
+  "pass": 90,
+  "pts": [
+   "แต่งกายเข้าพื้นที่: หมวกนิรภัย เสื้อสะท้อนแสง กางเกงขายาว รองเท้านิรภัย",
+   "ความเร็วในเขตบริษัทไม่เกิน 25-30 กม./ชม.",
+   "ห้ามเข้าใต้สายพานโรงโม่แร่และด้านหลังรถตัก",
+   "ลงจากรถทุกครั้งต้องหนุนหมอนรองล้อ"
+  ],
+  "q": [
+   [
+    "พนักงานขับรถต้องตรวจสอบอะไรในใบขึ้นสินค้าก่อนออกไปขึ้นสินค้า",
+    1,
+    "เบอร์โทรของหัวหน้างาน",
+    "ขนาดแร่ สถานที่ส่ง ทะเบียนรถ ชื่อคนขับ และชื่อลูกค้า",
+    "เลขประจำตัวพนักงาน",
+    "ราคาแร่ในตลาด"
+   ],
+   [
+    "ขั้นตอนแรกในการแจ้งเหตุฉุกเฉินระหว่างการขนส่งคืออะไร",
+    2,
+    "ไม่ต้องแจ้งใครก็ได้",
+    "โทรหาลูกค้า",
+    "แจ้งผู้ประกอบการหรือเจ้าของรถ / แจ้งประกันภัย",
+    "ถ่ายรูปอุบัติเหตุ"
+   ],
+   [
+    "การแต่งกายเมื่อเข้ามาภายในบริษัทหรือพื้นที่ลูกค้าควรแต่งกายแบบใด",
+    3,
+    "เสื้อยืด กางเกงยีนส์ รองเท้าแตะ",
+    "เสื้อโปโล กางเกงขาสั้น รองเท้าผ้าใบ",
+    "แต่งกายแบบใดก็ได้",
+    "หมวกนิรภัย เสื้อสะท้อนแสง กางเกงขายาว รองเท้านิรภัย"
+   ],
+   [
+    "จุดทำความสะอาดกระบะรถควรทำที่ใด",
+    3,
+    "ตู้ขาว",
+    "ลานตรวจสภาพขาเข้า",
+    "หน้าตราชั่ง",
+    "ลานจอดด้านในข้างศาลพระพรหม"
+   ],
+   [
+    "หากตรวจวัดแอลกอฮอล์ครั้งแรกไม่ผ่าน ต้องเว้นระยะเวลากี่ชั่วโมงก่อนตรวจซ้ำ",
+    2,
+    "2 ชั่วโมง",
+    "30 นาที",
+    "1 ชั่วโมง",
+    "3 ชั่วโมง"
+   ],
+   [
+    "เมื่อเข้าไปรับสินค้าห้ามพนักงานขับรถเข้าไปในจุดใดเพื่อความปลอดภัย",
+    3,
+    "ข้างรถบรรทุก",
+    "ใต้สายพานโรงโม่แร่",
+    "ด้านหลังรถตัก",
+    "ถูกทั้งข้อ ข. และ ค."
+   ],
+   [
+    "หากน้ำหนักแร่ 'เกิน' ต้องดำเนินการอย่างไร",
+    1,
+    "ขับออกได้ทันที",
+    "เทแร่ในพื้นที่ที่บริษัทกำหนด",
+    "แจ้ง รปภ.",
+    "ขออนุญาตรับส่วนเกินไว้ก่อน"
+   ],
+   [
+    "บริษัทฯ อนุญาตให้ใส่รองเท้าแตะได้เมื่อใด",
+    2,
+    "ขณะมายื่นใบส่งสินค้า",
+    "ตอนชั่งน้ำหนักที่ห้องชั่ง",
+    "เฉพาะขณะคุมผ้าใบที่จุดตรวจขาออก",
+    "ขณะรอรับสินค้าภายในบริษัท"
+   ],
+   [
+    "บริษัทฯ อนุญาตให้ใครเข้าพื้นที่ภายในได้บ้าง",
+    0,
+    "พนักงานขับรถที่แต่งกายตามระเบียบและมีใบขับขี่ ท.3 / ท.4",
+    "ผู้ติดตามทุกคน",
+    "เพื่อนที่มาด้วย",
+    "บุคคลทั่วไปที่ไม่มีการนัดหมาย"
+   ],
+   [
+    "ความเร็วที่อนุญาตในเขตบริษัทคือเท่าใด",
+    2,
+    "ไม่เกิน 60 กม./ชม.",
+    "ไม่เกิน 40 กม./ชม.",
+    "ไม่เกิน 25-30 กม./ชม.",
+    "ไม่เกิน 80 กม./ชม."
+   ],
+   [
+    "ห้ามล้างหรือเคลียร์กระบะรถในลานตรวจสภาพขาเข้าโดยเด็ดขาด",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "เอกสารที่ต้องมีมายื่นคิว ได้แก่ ใบขับขี่หรืออะไรก็ได้",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "เมื่อลงจากรถ ต้องหนุนหมอนรองล้อทุกครั้ง",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "พนักงานขับรถต้องแต่งกายให้เรียบร้อย โดยต้องใส่หมวกนิรภัย เสื้อสะท้อนแสง และรองเท้านิรภัย",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "เอกสารที่ต้องยื่นที่จุดตรวจสภาพขาออก ได้แก่ ใบส่งสินค้าและใบขึ้นสินค้า",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "การคลุมผ้าใบต้องปิดให้มิดชิด โดยเฉพาะปิดท้ายให้สนิทเพื่อความปลอดภัยในการขนส่ง",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "พนักงานขับรถและผู้ติดตาม สามารถแต่งกายใส่อะไรก็ได้ เพื่อคลุมผ้าใบในบริเวณฝั่งตรวจสภาพขาออก",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "ในเขตชุมชนและบริเวณบริษัทฯ สามารถขับรถได้ด้วยความเร็วมากกว่า 30 กม./ชั่วโมง",
+    1,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "การคลุมผ้าใบไม่อนุญาตให้คลุมออกมาจากข้างใน เว้นแต่ในกรณีที่ฝนตก",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ],
+   [
+    "อุปกรณ์ประจำรถต้องมี หมอนหนุนล้อ 4 ลูก, กรวยจราจร 4 อัน, ถังดับเพลิง 1-2 ถัง หรือ 4.5 kg ขึ้นไป",
+    0,
+    "ถูกต้อง",
+    "ไม่ถูกต้อง"
+   ]
+  ],
+  "sec": {
+   "0": "ส่วนที่ 1: ปรนัย เลือกข้อที่ถูกต้องที่สุดเพียงข้อเดียว",
+   "10": "ส่วนที่ 2: ข้อถูก/ข้อผิด เลือกว่าข้อความนั้นถูกต้องหรือไม่"
+  }
+ }
+];
+
+
+const $=s=>document.querySelector(s),app=$("#app");
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const shuf=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const STEPS=["ข้อมูลผู้เรียน","ทดสอบก่อนเรียน","ดูวิดีโอ","ทดสอบหลังเรียน","ใบรับรอง"];
+let S={};
+
+function steps(n){return '<ol class="steps">'+STEPS.map((t,i)=>`<li class="${i<n?'done':i==n?'on':''}">${t}</li>`).join("")+'</ol>'}
+
+function home(){
+  S={};$("main").classList.remove("wide");$("#sub").textContent="เลือกหลักสูตรที่ต้องการเรียน";
+  app.innerHTML=COURSES.map((c,i)=>`<button class="card" data-i="${i}"><h3>${c.title}</h3><span>${c.desc} · วิดีโอประมาณ ${c.min} นาที</span></button>`).join("")
+   +`<p class="note">เรียนครบทุกขั้นตอนและผ่านเกณฑ์แบบทดสอบหลังเรียนจึงจะได้รับใบรับรอง</p>`;
+  app.querySelectorAll(".card").forEach(b=>b.onclick=()=>info(COURSES[b.dataset.i]));
+}
+
+function info(c){
+  S={c};$("#sub").textContent=c.title;
+  app.innerHTML=`<button class="g" id="back">กลับไปเลือกหลักสูตร</button>${steps(0)}
+  <h2>กรอกข้อมูลผู้เรียน</h2>
+  <label class="f" for="n">ชื่อ-นามสกุล</label><input type="text" id="n" autocomplete="name">
+  <label class="f" for="p">ทะเบียนรถ</label><input type="text" id="p">
+  <label class="f" for="o">ชื่อบริษัทผู้ประกอบการ</label><input type="text" id="o">
+  <label class="f" for="l">ประเภทใบขับขี่</label><select id="l"><option value="">เลือก</option><option>ท.3</option><option>ท.4</option></select>
+  <br><button class="b" id="go">เริ่มทดสอบก่อนเรียน</button>`;
+  let sv={};try{sv=JSON.parse(localStorage.getItem("se_info")||"{}")}catch(e){}
+  const set=(i,v)=>{if(v)$(i).value=v};set("#n",sv.name);set("#p",sv.plate);set("#o",sv.co);set("#l",sv.lic);
+  $("#back").onclick=home;
+  $("#go").onclick=()=>{const v=i=>$(i).value.trim();
+    Object.assign(S,{own:false,name:v("#n"),emp:"",plate:v("#p"),co:v("#o"),lic:v("#l")});
+    if(!S.name||!S.plate||!S.co||!S.lic){alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");return}
+    try{localStorage.setItem("se_info",JSON.stringify({name:S.name,plate:S.plate,co:S.co,lic:S.lic}))}catch(e){}
+    S.try=0;quiz("pre")};
+}
+
+function quiz(kind){
+  const c=S.c,pre=kind=="pre";
+  S.qs=c.q.map(q=>({t:q[0],ok:q[2+q[1]],o:q.slice(2)}));
+  app.innerHTML=`${steps(pre?1:3)}<h2>${pre?"แบบทดสอบก่อนเรียน":"แบบทดสอบหลังเรียน"}</h2>
+  <p class="note">${pre?"ยังไม่ต้องกังวลกับคะแนน ใช้เทียบกับผลหลังเรียน":"ต้องตอบถูก "+Math.ceil(c.q.length*(c.pass||CONFIG.passPercent)/100)+" จาก "+c.q.length+" ข้อขึ้นไปจึงจะผ่าน"}</p>`
+  +S.qs.map((q,i)=>(c.sec&&c.sec[i]?`<h3 class="sec">${c.sec[i]}</h3>`:"")+`<div class="q"><p>${i+1}. ${q.t}</p>`+q.o.map((o,j)=>`<label><input type="radio" name="q${i}" value="${esc(o)}"> ${q.o.length>2?"กขคง"[j]+". ":""}${o}</label>`).join("")+`</div>`).join("")
+  +`<button class="b" id="sub2">ส่งคำตอบ</button>`;
+  $("#sub2").onclick=()=>{
+    let s=0;
+    for(let i=0;i<S.qs.length;i++){const r=document.querySelector(`input[name=q${i}]:checked`);
+      if(!r){alert("ยังตอบไม่ครบ ข้อที่ "+(i+1));return}
+      if(r.value===esc(S.qs[i].ok)||r.value===S.qs[i].ok)s++}
+    pre?(S.pre=s,video()):after(s)};
+}
+
+function video(){
+  const c=S.c;
+  app.innerHTML=`${steps(2)}<p class="note">ผลทดสอบก่อนเรียน: ${S.pre}/${c.q.length} ข้อ</p><h2>${c.title}</h2>
+  <div class="vid" id="vid"></div>
+  <ul class="pts">${c.pts.map(p=>`<li>${p}</li>`).join("")}</ul>
+  <button class="b" id="next" disabled>ทำแบบทดสอบหลังเรียน</button><span class="note" id="hint">ปุ่มจะเปิดเมื่อดูวิดีโอจบ</span>`;
+  const unlock=()=>{$("#next").disabled=false;$("#hint").textContent=""};
+  $("#next").onclick=()=>quiz("post");
+  if(c.yt){
+    $("#vid").innerHTML='<div id="yt"></div>';
+    const mk=()=>new YT.Player("yt",{videoId:c.yt,playerVars:{rel:0},events:{onStateChange:e=>{if(e.data===0)unlock()}}});
+    if(window.YT&&YT.Player)mk();else{window.onYouTubeIframeAPIReady=mk;const s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";document.head.appendChild(s)}
+  }else{
+    $("#vid").innerHTML='<div>โหมดทดลอง: ยังไม่ได้ใส่วิดีโอ<br>ใส่รหัส YouTube ที่ช่อง <b>yt</b> ของหลักสูตรนี้<br><button class="b" id="skip">ข้าม (ทดลอง)</button></div>';
+    $("#skip").onclick=unlock;
+  }
+}
+
+async function post(rec){
+  const r=await fetch(CONFIG.hook,{method:"POST",body:JSON.stringify(rec)});
+  const t=await r.text();
+  if(!r.ok||t.trim()!=="ok")throw new Error(t);
+}
+const pend=()=>{try{return JSON.parse(localStorage.getItem("se_pending")||"[]")}catch(e){return[]}};
+const setPend=a=>{try{localStorage.setItem("se_pending",JSON.stringify(a))}catch(e){}};
+async function flush(){
+  const q=pend();if(!q.length||!CONFIG.hook)return true;
+  const left=[];for(const r of q){try{await post(r)}catch(e){left.push(r)}}
+  setPend(left);return !left.length;
+}
+async function send(ok){
+  if(!CONFIG.hook)return;
+  const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8); // กันบันทึกซ้ำถ้าต้องส่งใหม่
+  setPend(pend().concat([{id,time:new Date().toISOString(),result:ok?"ผ่าน":"ไม่ผ่าน",attempt:S.try,no:ok?S.no:"",type:"รถร่วม",name:S.name,emp:"",plate:S.plate,company:S.co,license:S.lic,course:S.c.title,pre:S.pre,post:S.post,total:S.c.q.length}]));
+  const done=await flush(),el=$("#sv");
+  if(el)el.textContent=done?"บันทึกผลเรียบร้อยแล้ว":"บันทึกผลไม่สำเร็จ (ตรวจอินเทอร์เน็ต) ระบบจะส่งใหม่เมื่อเปิดเว็บนี้อีกครั้ง";
+}
+
+function after(s){
+  const c=S.c,tot=c.q.length,pct=Math.round(s/tot*100),ok=pct>=(c.pass||CONFIG.passPercent);S.post=s;S.try=(S.try||0)+1;
+  app.innerHTML=`${steps(ok?4:3)}<p class="score ${ok?"pass":"fail"}">${s}/${tot} (${pct}%)</p>
+  <h2>${ok?"ผ่านการอบรม":"ยังไม่ผ่านเกณฑ์"}</h2>
+  <p>ก่อนเรียน ${S.pre}/${tot} ข้อ → หลังเรียน ${s}/${tot} ข้อ</p>
+  <p class="note" id="sv">${CONFIG.hook?"กำลังบันทึกผล...":""}</p>
+  ${ok?`<canvas id="cv"></canvas><br><button class="b" id="dl">ดาวน์โหลดใบรับรอง (PNG)</button><button class="b" id="home">กลับหน้าหลัก</button>`
+      :`<button class="b" id="rv">ดูวิดีโออีกครั้ง</button><button class="b" id="rt">ทำแบบทดสอบใหม่</button>`}`;
+  if(ok){S.no="SE-"+new Date().toISOString().slice(0,10).replace(/-/g,"")+"-"+(Math.random()*65536|0).toString(16).toUpperCase().padStart(4,"0");
+    cert();$("#home").onclick=home;
+    send(true);
+  }else{send(false);$("#rv").onclick=video;$("#rt").onclick=()=>quiz("post")}
+}
+
+async function cert(){
+  await document.fonts.load('500 60px Mitr');await document.fonts.load('400 30px "Noto Sans Thai"');
+  const cv=$("#cv"),x=cv.getContext("2d");cv.width=1600;cv.height=1130;
+  x.fillStyle="#FBFAF5";x.fillRect(0,0,1600,1130);
+  for(const y of[0,1090])for(let i=0;i<30;i++){x.fillStyle=i%2?"#23262B":"#F2B705";x.beginPath();x.moveTo(i*60,y);x.lineTo(i*60+60,y);x.lineTo(i*60+30,y+40);x.lineTo(i*60-30,y+40);x.fill()}
+  x.textAlign="center";x.fillStyle="#23262B";
+  const t=(s,y,f)=>{x.font=f;x.fillText(s,800,y)};
+  t(CONFIG.company,200,'400 34px "Noto Sans Thai"');
+  t("ใบรับรองผลการอบรม",330,'500 96px Mitr');
+  t("ขอรับรองว่า",450,'400 36px "Noto Sans Thai"');
+  t(S.name,580,'500 80px Mitr');
+  x.fillRect(400,610,800,4);
+  const L=S.own?["รหัสพนักงาน "+S.emp+"   ใบขับขี่ "+S.lic]:["สังกัด "+S.co,"ทะเบียนรถ "+S.plate+"   ใบขับขี่ "+S.lic];
+  L.forEach((m,i)=>t(m,L.length>1?650+i*48:670,'400 32px "Noto Sans Thai"'));
+  t("ผ่านการอบรมหลักสูตร",750,'400 36px "Noto Sans Thai"');
+  t(S.c.title,830,'500 60px Mitr');
+  t("คะแนนหลังเรียน "+S.post+"/"+S.c.q.length+" ข้อ",910,'400 32px "Noto Sans Thai"');
+  t("วันที่ "+new Date().toLocaleDateString("th-TH",{dateStyle:"long"})+"   เลขที่ "+S.no,1000,'400 30px "Noto Sans Thai"');
+  $("#dl").onclick=()=>{const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download="certificate-"+S.no+".png";a.click()};
+}
+/* ===== หน้าเจ้าหน้าที่ (ดูรายชื่อ + ดาวน์โหลด Excel) เปิดจากลิงก์ท้ายหน้า หรือเติม #admin ท้าย URL ===== */
+const loadX=()=>window.XLSX?Promise.resolve():new Promise((ok,no)=>{const e=document.createElement("script");e.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";e.onload=ok;e.onerror=no;document.head.appendChild(e)});
+const fmtD=v=>{const d=new Date(v);return isNaN(d)?v:d.toLocaleString("th-TH")};
+const stt=(m,c)=>{$("#st").textContent=m;$("#st").className="note "+(c||"")};
+let AR=[];
+function admin(){
+  S={};$("#sub").textContent="สำหรับเจ้าหน้าที่";$("main").classList.add("wide");
+  app.innerHTML=`<button class="g" id="back">กลับหน้าหลัก</button>
+  <h2>รายชื่อผู้อบรม</h2>
+  <label class="f" for="k">รหัสผ่านแอดมิน</label><input type="password" id="k" autocomplete="current-password">
+  <br><button class="b" id="ld">โหลดข้อมูล</button><div id="st" class="note" role="status"></div>
+  <div id="tools" hidden>
+   <div class="row"><div><label class="f" for="q">ค้นหา</label><input type="text" id="q" placeholder="ชื่อ ทะเบียน บริษัท"></div>
+   <div><label class="f" for="fc">หลักสูตร</label><select id="fc"></select></div>
+   <div><label class="f" for="fr">ผลสอบ</label><select id="fr"><option value="">ทั้งหมด</option><option>ผ่าน</option><option>ไม่ผ่าน</option></select></div></div>
+   <button class="b" id="dl">ดาวน์โหลด Excel (ตามที่กรอง)</button>
+   <p class="note" id="cnt"></p><div class="tw"><table id="tb"></table></div></div>`;
+  $("#back").onclick=home;$("#ld").onclick=aLoad;$("#dl").onclick=aDl;
+  $("#k").addEventListener("keydown",e=>{if(e.key==="Enter")aLoad()});
+  ["#q","#fc","#fr"].forEach(x=>$(x).addEventListener("input",aDraw));
+}
+async function aLoad(){
+  if(!CONFIG.hook){stt("ยังไม่ได้ใส่ URL ของ Apps Script ที่ CONFIG.hook","bad");return}
+  const key=$("#k").value;if(!key){stt("กรอกรหัสผ่านก่อน","bad");return}
+  $("#ld").disabled=true;stt("กำลังดึงข้อมูล...");
+  try{
+    const r=await fetch(CONFIG.hook,{method:"POST",body:JSON.stringify({action:"list",key})});
+    const d=await r.json();
+    if(!d.ok){stt("รหัสผ่านไม่ถูกต้อง หรือยังไม่ได้ตั้ง ADMIN_KEY ใน Apps Script","bad");$("#tools").hidden=true}
+    else if(d.rows.length<2){stt("ยังไม่มีข้อมูลการสอบ","bad");$("#tools").hidden=true}
+    else{AR=d.rows.slice(1).reverse();stt("");
+      $("#fc").innerHTML='<option value="">ทั้งหมด</option>'+[...new Set(AR.map(r=>r[10]).filter(Boolean))].map(c=>`<option>${esc(c)}</option>`).join("");
+      $("#tools").hidden=false;aDraw()}
+  }catch(e){stt("ดึงข้อมูลไม่สำเร็จ ตรวจ URL และการ Deploy ของ Apps Script","bad")}
+  $("#ld").disabled=false;
+}
+// คอลัมน์ในชีต: 0 เวลา 1 ผล 2 ครั้ง 3 เลขที่ 4 ประเภทรถ 5 ชื่อ 6 รหัส 7 ทะเบียน 8 บริษัท 9 ใบขับขี่ 10 หลักสูตร 11 ก่อน 12 หลัง 13 เต็ม
+function aRows(){
+  const q=$("#q").value.trim().toLowerCase(),c=$("#fc").value,f=$("#fr").value;
+  return AR.filter(r=>(!c||r[10]===c)&&(!f||r[1]===f)&&(!q||[r[3],r[5],r[7],r[8]].join(" ").toLowerCase().includes(q)));
+}
+function aDraw(){
+  const rs=aRows();
+  $("#cnt").textContent=`แสดง ${rs.length} จาก ${AR.length} รายการ (ใหม่สุดอยู่บนสุด)`;
+  $("#tb").innerHTML="<tr><th>วันที่</th><th>ผล</th><th>ชื่อ-นามสกุล</th><th>ทะเบียนรถ</th><th>บริษัทผู้ประกอบการ</th><th>ใบขับขี่</th><th>หลักสูตร</th><th>ก่อน→หลัง</th><th>เลขที่ใบรับรอง</th></tr>"
+   +rs.map(r=>`<tr><td>${esc(fmtD(r[0]))}</td><td class="${r[1]==="ผ่าน"?"ap":"af"}">${esc(r[1])}</td><td>${esc(r[5])}</td><td>${esc(r[7])}</td><td>${esc(r[8])}</td><td>${esc(r[9])}</td><td>${esc(r[10])}</td><td>${esc(r[11])}→${esc(r[12])}/${esc(r[13])}</td><td>${esc(r[3])}</td></tr>`).join("");
+}
+async function aDl(){
+  try{await loadX()}catch(e){alert("โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่");return}
+  const chrono=aRows().slice().reverse(),m=new Map();
+  chrono.filter(r=>r[1]==="ผ่าน").forEach(r=>m.set([r[5],r[7],r[10]].join("|"),r));
+  const pass=[["ชื่อ-นามสกุล","ทะเบียนรถ","บริษัทผู้ประกอบการ","ใบขับขี่","หลักสูตร","คะแนนหลังเรียน","เต็ม","เลขที่ใบรับรอง","วันที่ผ่าน"]]
+   .concat([...m.values()].map(r=>[r[5],r[7],r[8],r[9],r[10],r[12],r[13],r[3],fmtD(r[0])]));
+  const log=[["เวลา","ผลสอบ","ครั้งที่สอบ","เลขที่ใบรับรอง","ชื่อ-นามสกุล","ทะเบียนรถ","บริษัทผู้ประกอบการ","ใบขับขี่","หลักสูตร","ก่อนเรียน","หลังเรียน","เต็ม"]]
+   .concat(chrono.map(r=>[fmtD(r[0]),r[1],r[2],r[3],r[5],r[7],r[8],r[9],r[10],r[11],r[12],r[13]]));
+  const wb=XLSX.utils.book_new();
+  [[pass,"ผ่านการอบรม",[26,14,28,10,30,14,6,22,22]],[log,"ทุกครั้งที่สอบ",[22,10,10,22,26,14,28,10,30,12,12,10]]].forEach(([a,n,w])=>{
+    const ws=XLSX.utils.aoa_to_sheet(a);ws["!cols"]=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,n)});
+  XLSX.writeFile(wb,"รายชื่อผู้อบรม-"+new Date().toISOString().slice(0,10)+".xlsx");
+}
+$("#adm").onclick=admin;if(!CONFIG.hook)$("#adm").hidden=true; // ซ่อนลิงก์เจ้าหน้าที่ถ้ายังไม่ได้ตั้งที่เก็บข้อมูล
+flush();
+location.hash==="#admin"?admin():home();
+</script>
+</body>
+</html>
