@@ -409,9 +409,9 @@ function after(s){
   }else{send(false);$("#rv").onclick=video;$("#rt").onclick=()=>quiz("post")}
 }
 
-async function cert(){
+async function drawCert(d,cv){
   await document.fonts.load('500 60px Mitr');await document.fonts.load('400 30px "Noto Sans Thai"');
-  const cv=$("#cv"),x=cv.getContext("2d");cv.width=1600;cv.height=1130;
+  const x=cv.getContext("2d");cv.width=1600;cv.height=1130;
   x.fillStyle="#FBFAF5";x.fillRect(0,0,1600,1130);
   for(const y of[0,1090])for(let i=0;i<30;i++){x.fillStyle=i%2?"#23262B":"#F2B705";x.beginPath();x.moveTo(i*60,y);x.lineTo(i*60+60,y);x.lineTo(i*60+30,y+40);x.lineTo(i*60-30,y+40);x.fill()}
   x.textAlign="center";x.fillStyle="#23262B";
@@ -419,21 +419,28 @@ async function cert(){
   t(CONFIG.company,200,'400 34px "Noto Sans Thai"');
   t("ใบรับรองผลการอบรม",330,'500 96px Mitr');
   t("ขอรับรองว่า",450,'400 36px "Noto Sans Thai"');
-  t(S.name,580,'500 80px Mitr');
+  t(d.name,580,'500 80px Mitr');
   x.fillRect(400,610,800,4);
-  const L=S.own?["รหัสพนักงาน "+S.emp+"   ใบขับขี่ "+S.lic]:["สังกัด "+S.co,"ทะเบียนรถ "+S.plate+"   ใบขับขี่ "+S.lic];
-  L.forEach((m,i)=>t(m,L.length>1?650+i*48:670,'400 32px "Noto Sans Thai"'));
-  t("ผ่านการอบรมหลักสูตร",750,'400 36px "Noto Sans Thai"');
-  t(S.c.title,830,'500 60px Mitr');
-  t("คะแนนหลังเรียน "+S.post+"/"+S.c.q.length+" ข้อ",910,'400 32px "Noto Sans Thai"');
-  t("วันที่ "+new Date().toLocaleDateString("th-TH",{dateStyle:"long"})+"   เลขที่ "+S.no,1000,'400 30px "Noto Sans Thai"');
-  $("#dl").onclick=()=>{const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download="certificate-"+S.no+".png";a.click()};
+  t("สังกัด "+d.co,650,'400 32px "Noto Sans Thai"');
+  t("ทะเบียนรถ "+d.plate+"   ใบขับขี่ "+d.lic,698,'400 32px "Noto Sans Thai"');
+  t("ผ่านการอบรมหลักสูตร",770,'400 36px "Noto Sans Thai"');
+  t(d.course,845,'500 60px Mitr');
+  t("คะแนนหลังเรียน "+d.post+"/"+d.total+" ข้อ",920,'400 32px "Noto Sans Thai"');
+  const dt=new Date(d.date),ds=isNaN(dt)?"":"วันที่ "+dt.toLocaleDateString("th-TH",{dateStyle:"long"})+"   ";
+  t(ds+"เลขที่ "+d.no,1000,'400 30px "Noto Sans Thai"');
 }
+const dlCert=(cv,no)=>{const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download="certificate-"+no+".png";a.click()};
+async function cert(){
+  const cv=$("#cv");
+  await drawCert({name:S.name,co:S.co,plate:S.plate,lic:S.lic,course:S.c.title,post:S.post,total:S.c.q.length,no:S.no,date:new Date()},cv);
+  $("#dl").onclick=()=>dlCert(cv,S.no);
+}
+
 /* ===== หน้าเจ้าหน้าที่ (ดูรายชื่อ + ดาวน์โหลด Excel) เปิดจากลิงก์ท้ายหน้า หรือเติม #admin ท้าย URL ===== */
 const loadX=()=>window.XLSX?Promise.resolve():new Promise((ok,no)=>{const e=document.createElement("script");e.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";e.onload=ok;e.onerror=no;document.head.appendChild(e)});
 const fmtD=v=>{const d=new Date(v);return isNaN(d)?v:d.toLocaleString("th-TH")};
 const stt=(m,c)=>{$("#st").textContent=m;$("#st").className="note "+(c||"")};
-let AR=[];
+let AR=[];const SEL=new Set();
 function admin(){
   S={};$("#sub").textContent="สำหรับเจ้าหน้าที่";$("main").classList.add("wide");
   app.innerHTML=`<button class="g" id="back">กลับหน้าหลัก</button>
@@ -445,8 +452,13 @@ function admin(){
    <div><label class="f" for="fc">หลักสูตร</label><select id="fc"></select></div>
    <div><label class="f" for="fr">ผลสอบ</label><select id="fr"><option value="">ทั้งหมด</option><option>ผ่าน</option><option>ไม่ผ่าน</option></select></div></div>
    <button class="b" id="dl">ดาวน์โหลด Excel (ตามที่กรอง)</button>
+   <button class="b" id="del" disabled>ลบที่เลือก</button><button class="b" id="clr">ล้างข้อมูลทั้งหมด</button>
    <p class="note" id="cnt"></p><div class="tw"><table id="tb"></table></div></div>`;
-  $("#back").onclick=home;$("#ld").onclick=aLoad;$("#dl").onclick=aDl;
+  $("#back").onclick=home;$("#ld").onclick=aLoad;$("#dl").onclick=aDl;$("#del").onclick=aDel;$("#clr").onclick=aClr;
+  $("#tb").addEventListener("change",e=>{const t=e.target;
+    if(t.id==="all"){aRows().forEach(r=>t.checked?SEL.add(r[15]):SEL.delete(r[15]));aDraw()}
+    else if(t.dataset.r){const n=+t.dataset.r;t.checked?SEL.add(n):SEL.delete(n);updDel()}});
+  $("#tb").addEventListener("click",e=>{const n=e.target.dataset.c;if(n)aCert(+n)});
   $("#k").addEventListener("keydown",e=>{if(e.key==="Enter")aLoad()});
   ["#q","#fc","#fr"].forEach(x=>$(x).addEventListener("input",aDraw));
 }
@@ -459,7 +471,7 @@ async function aLoad(){
     const d=await r.json();
     if(!d.ok){stt("รหัสผ่านไม่ถูกต้อง หรือยังไม่ได้ตั้ง ADMIN_KEY ใน Apps Script","bad");$("#tools").hidden=true}
     else if(d.rows.length<2){stt("ยังไม่มีข้อมูลการสอบ","bad");$("#tools").hidden=true}
-    else{AR=d.rows.slice(1).reverse();stt("");
+    else{SEL.clear();AR=d.rows.slice(1).map((r,i)=>{const x=r.slice(0,15);while(x.length<15)x.push("");x.push(i+2);return x}).reverse();stt("");
       $("#fc").innerHTML='<option value="">ทั้งหมด</option>'+[...new Set(AR.map(r=>r[10]).filter(Boolean))].map(c=>`<option>${esc(c)}</option>`).join("");
       $("#tools").hidden=false;aDraw()}
   }catch(e){stt("ดึงข้อมูลไม่สำเร็จ ตรวจ URL และการ Deploy ของ Apps Script","bad")}
@@ -470,11 +482,39 @@ function aRows(){
   const q=$("#q").value.trim().toLowerCase(),c=$("#fc").value,f=$("#fr").value;
   return AR.filter(r=>(!c||r[10]===c)&&(!f||r[1]===f)&&(!q||[r[3],r[5],r[7],r[8]].join(" ").toLowerCase().includes(q)));
 }
+function updDel(){const b=$("#del");b.disabled=!SEL.size;b.textContent=SEL.size?`ลบที่เลือก (${SEL.size})`:"ลบที่เลือก";
+  const rs=aRows(),all=$("#all");if(all)all.checked=rs.length>0&&rs.every(r=>SEL.has(r[15]))}
 function aDraw(){
   const rs=aRows();
   $("#cnt").textContent=`แสดง ${rs.length} จาก ${AR.length} รายการ (ใหม่สุดอยู่บนสุด)`;
-  $("#tb").innerHTML="<tr><th>วันที่</th><th>ผล</th><th>ชื่อ-นามสกุล</th><th>ทะเบียนรถ</th><th>บริษัทผู้ประกอบการ</th><th>ใบขับขี่</th><th>หลักสูตร</th><th>ก่อน→หลัง</th><th>เลขที่ใบรับรอง</th></tr>"
-   +rs.map(r=>`<tr><td>${esc(fmtD(r[0]))}</td><td class="${r[1]==="ผ่าน"?"ap":"af"}">${esc(r[1])}</td><td>${esc(r[5])}</td><td>${esc(r[7])}</td><td>${esc(r[8])}</td><td>${esc(r[9])}</td><td>${esc(r[10])}</td><td>${esc(r[11])}→${esc(r[12])}/${esc(r[13])}</td><td>${esc(r[3])}</td></tr>`).join("");
+  $("#tb").innerHTML='<tr><th><input type="checkbox" id="all" aria-label="เลือกทั้งหมดที่แสดง"></th><th>วันที่</th><th>ผล</th><th>ชื่อ-นามสกุล</th><th>ทะเบียนรถ</th><th>บริษัทผู้ประกอบการ</th><th>ใบขับขี่</th><th>หลักสูตร</th><th>ก่อน→หลัง</th><th>เลขที่ใบรับรอง</th><th>ใบรับรอง</th></tr>'
+   +rs.map(r=>`<tr><td><input type="checkbox" data-r="${r[15]}"${SEL.has(r[15])?" checked":""}></td><td>${esc(fmtD(r[0]))}</td><td class="${r[1]==="ผ่าน"?"ap":"af"}">${esc(r[1])}</td><td>${esc(r[5])}</td><td>${esc(r[7])}</td><td>${esc(r[8])}</td><td>${esc(r[9])}</td><td>${esc(r[10])}</td><td>${esc(r[11])}→${esc(r[12])}/${esc(r[13])}</td><td>${esc(r[3])}</td><td>${r[1]==="ผ่าน"?`<button class="g" data-c="${r[15]}">ดาวน์โหลด</button>`:""}</td></tr>`).join("");
+  updDel();
+}
+async function aCert(row){
+  const r=AR.find(x=>x[15]===row);if(!r)return;
+  const cv=document.createElement("canvas");
+  await drawCert({name:r[5],co:r[8],plate:r[7],lic:r[9],course:r[10],post:r[12],total:r[13],no:r[3]||"-",date:r[0]},cv);
+  dlCert(cv,r[3]||("row"+row));
+}
+async function aAct(body,msg){
+  stt(msg);
+  try{
+    const r=await fetch(CONFIG.hook,{method:"POST",body:JSON.stringify({...body,key:$("#k").value})});
+    const d=await r.json();
+    if(!d.ok){stt("ลบไม่สำเร็จ (รหัสผ่านไม่ถูกต้อง)","bad");return}
+    SEL.clear();await aLoad();
+    stt(body.action==="clear"?`ล้างข้อมูลแล้ว ${d.deleted} รายการ`:`ลบแล้ว ${d.deleted} รายการ`+(d.deleted<body.items.length?` (ข้าม ${body.items.length-d.deleted} รายการที่ข้อมูลเปลี่ยนไป ลองใหม่อีกครั้ง)`:""),"ok");
+  }catch(e){stt("ลบไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่","bad")}
+}
+async function aDel(){
+  if(!SEL.size)return;
+  if(!confirm("ลบ "+SEL.size+" รายการที่เลือก? ลบแล้วกู้คืนไม่ได้ (แนะนำให้ดาวน์โหลด Excel เก็บไว้ก่อน)"))return;
+  await aAct({action:"delete",items:AR.filter(r=>SEL.has(r[15])).map(r=>({row:r[15],id:r[14],time:r[0]}))},"กำลังลบ...");
+}
+async function aClr(){
+  if(prompt("ล้างข้อมูลผลสอบทั้งหมดในชีต (กู้คืนไม่ได้)\nพิมพ์คำว่า ลบทั้งหมด เพื่อยืนยัน")!=="ลบทั้งหมด")return;
+  await aAct({action:"clear"},"กำลังล้างข้อมูล...");
 }
 async function aDl(){
   try{await loadX()}catch(e){alert("โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่");return}
