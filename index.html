@@ -42,6 +42,10 @@ canvas{width:100%;height:auto;border:2px solid var(--ink);margin-top:12px}
 .note{color:var(--mut);font-size:15px}
 @media (prefers-reduced-motion:no-preference){.card{transition:background .15s}}
 main.wide{max-width:1100px}
+.resume{border:2px solid var(--ink);background:#FFF6D6;padding:14px 20px;margin:14px 0}
+.priv{border-left:6px solid var(--ink);padding:8px 14px;background:#fff;font-size:15px;margin:18px 0 6px}
+.chk{display:block;cursor:pointer;margin-top:6px}
+.due-over{color:var(--bad);font-weight:600}.due-soon{color:#9A6B00;font-weight:600}
 footer{max-width:760px;margin:auto;padding:0 20px 40px;text-align:right}
 .row{display:flex;flex-wrap:wrap;gap:10px}.row>div{flex:1 1 180px}
 .tw{overflow-x:auto;border:2px solid var(--ink);background:#fff;margin-top:8px}
@@ -61,8 +65,11 @@ th{background:var(--ink);color:#fff}
 const CONFIG={
   company:"บริษัท เซ้าท์อีสต์ทรานสปอร์ต จำกัด",
   passPercent:80,
+  renewMonths:12, // ต้องอบรมซ้ำทุกกี่เดือน (ใช้แสดงสถานะ "ครบกำหนด" ในหน้าเจ้าหน้าที่) ใส่ 0 = ปิด
+  privacyContact:"", // ช่องทางติดต่อเรื่องข้อมูลส่วนบุคคล เช่น เบอร์โทร/อีเมล (เว้นว่างได้)
   hook:"https://script.google.com/macros/s/AKfycbzcUYDTrNkCNI9FagxLpxTo7xhXCcSG-uPKGBB91FxkJTgn4jRheNXF6T4rcOvxs4YK/exec" // วาง URL ของ Apps Script (ลงท้ายด้วย /exec) ที่นี่ เพื่อเก็บผลสอบลง Google Sheet (เว้นว่าง = ไม่เก็บ)
 };
+const PRIV="บริษัทเก็บข้อมูลของท่าน ได้แก่ ชื่อ-นามสกุล ทะเบียนรถ ชื่อบริษัทผู้ประกอบการ ประเภทและเลขที่ใบขับขี่ และผลการทำแบบทดสอบ เพื่อใช้เป็นหลักฐานการอบรมความปลอดภัยและออกใบรับรอง เฉพาะเจ้าหน้าที่ที่บริษัทมอบหมายเท่านั้นที่เข้าถึงข้อมูลนี้ได้"+(CONFIG.privacyContact?" หากต้องการสอบถามหรือขอแก้ไขข้อมูล ติดต่อ "+CONFIG.privacyContact:"");
 /* ข้อสอบ: [คำถาม, ลำดับคำตอบที่ถูก (เริ่มนับที่ 0), ตัวเลือก...] เรียงตามที่เขียนไว้ ไม่สลับ
    yt = รหัสวิดีโอ YouTube (Unlisted) ถ้าว่างจะแสดงโหมดทดลอง  sec = หัวข้อส่วนของข้อสอบ  pass = เกณฑ์ผ่านเป็น % (ถ้าไม่ใส่ใช้ CONFIG.passPercent) */
 const COURSES=[
@@ -316,11 +323,28 @@ let S={};
 
 function steps(n){return '<ol class="steps">'+STEPS.map((t,i)=>`<li class="${i<n?'done':i==n?'on':''}">${t}</li>`).join("")+'</ol>'}
 
+const PK="se_progress";
+function saveP(step){try{localStorage.setItem(PK,JSON.stringify({cid:S.c.id,step,pre:S.pre,try:S.try,name:S.name,plate:S.plate,co:S.co,lic:S.lic,lno:S.lno,consentAt:S.consentAt,watched:!!S.watched,at:Date.now()}))}catch(e){}}
+const loadP=()=>{try{const p=JSON.parse(localStorage.getItem(PK)||"null");return p&&Date.now()-p.at<864e5&&COURSES.some(c=>c.id===p.cid)?p:null}catch(e){return null}};
+const clearP=()=>{try{localStorage.removeItem(PK)}catch(e){}};
+function resume(p){
+  const c=COURSES.find(x=>x.id===p.cid);
+  S={c,own:false,emp:"",name:p.name,plate:p.plate,co:p.co,lic:p.lic,lno:p.lno,consentAt:p.consentAt,pre:p.pre,try:p.try||0,watched:!!p.watched};
+  $("#sub").textContent=c.title;
+  p.step==="post"?quiz("post"):p.step==="pre"?quiz("pre"):video();
+}
 function home(){
   S={};$("main").classList.remove("wide");$("#sub").textContent="เลือกหลักสูตรที่ต้องการเรียน";
-  app.innerHTML=COURSES.map((c,i)=>`<button class="card" data-i="${i}"><h3>${c.title}</h3><span>${c.desc} · วิดีโอประมาณ ${c.min} นาที</span></button>`).join("")
+  const p=loadP(),pc=p&&COURSES.find(c=>c.id===p.cid),inapp=/Line\/|FBAN|FBAV|Instagram|MicroMessenger/i.test(navigator.userAgent);
+  const stepName={pre:"ขั้นทำแบบทดสอบก่อนเรียน",video:"ขั้นดูวิดีโอ",post:"ขั้นทำแบบทดสอบหลังเรียน"};
+  app.innerHTML=(inapp?`<div class="resume" role="note">ถ้าวิดีโอเด้งไปเบราว์เซอร์หรือแอปอื่น ให้เปิดลิงก์นี้ใน Chrome หรือ Safari แทน<br><button class="g" id="cp">คัดลอกลิงก์เว็บ</button></div>`:"")
+   +(pc?`<div class="resume"><b>ทำค้างไว้</b><br>${esc(p.name)} · ${pc.title} · ${stepName[p.step]||""}<br><button class="b" id="rs">ทำต่อ</button><button class="g" id="rn">เริ่มใหม่</button></div>`:"")
+   +COURSES.map((c,i)=>`<button class="card" data-i="${i}"><h3>${c.title}</h3><span>${c.desc} · วิดีโอประมาณ ${c.min} นาที</span></button>`).join("")
    +`<p class="note">เรียนครบทุกขั้นตอนและผ่านเกณฑ์แบบทดสอบหลังเรียนจึงจะได้รับใบรับรอง</p>`;
   app.querySelectorAll(".card").forEach(b=>b.onclick=()=>info(COURSES[b.dataset.i]));
+  if($("#cp"))$("#cp").onclick=()=>{const u=location.origin+location.pathname;
+    (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>alert("คัดลอกลิงก์แล้ว นำไปวางในช่องที่อยู่ของ Chrome หรือ Safari"),()=>prompt("คัดลอกลิงก์นี้ไปวางใน Chrome หรือ Safari",u))};
+  if(pc){$("#rs").onclick=()=>resume(p);$("#rn").onclick=()=>{clearP();home()}}
 }
 
 function info(c){
@@ -331,19 +355,26 @@ function info(c){
   <label class="f" for="p">ทะเบียนรถ</label><input type="text" id="p">
   <label class="f" for="o">ชื่อบริษัทผู้ประกอบการ</label><input type="text" id="o">
   <label class="f" for="l">ประเภทใบขับขี่</label><select id="l"><option value="">เลือก</option><option>ท.3</option><option>ท.4</option></select>
+  <label class="f" for="ln">เลขที่ใบขับขี่</label><input type="text" id="ln" autocomplete="off">
+  <div class="note">ดูที่ด้านหน้าบัตรใบขับขี่ (ไม่ใช่เลขบัตรประชาชน 13 หลัก)</div>
+  <div class="priv"><b>การเก็บข้อมูลส่วนบุคคล</b><br>${esc(PRIV)}</div>
+  <label class="chk"><input type="checkbox" id="cs"> ข้าพเจ้ารับทราบและยินยอมให้เก็บข้อมูลตามข้อความข้างต้น</label>
   <br><button class="b" id="go">เริ่มทดสอบก่อนเรียน</button>`;
   let sv={};try{sv=JSON.parse(localStorage.getItem("se_info")||"{}")}catch(e){}
-  const set=(i,v)=>{if(v)$(i).value=v};set("#n",sv.name);set("#p",sv.plate);set("#o",sv.co);set("#l",sv.lic);
+  const set=(i,v)=>{if(v)$(i).value=v};set("#n",sv.name);set("#p",sv.plate);set("#o",sv.co);set("#l",sv.lic);set("#ln",sv.lno);
   $("#back").onclick=home;
   $("#go").onclick=()=>{const v=i=>$(i).value.trim();
-    Object.assign(S,{own:false,name:v("#n"),emp:"",plate:v("#p"),co:v("#o"),lic:v("#l")});
-    if(!S.name||!S.plate||!S.co||!S.lic){alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");return}
-    try{localStorage.setItem("se_info",JSON.stringify({name:S.name,plate:S.plate,co:S.co,lic:S.lic}))}catch(e){}
-    S.try=0;quiz("pre")};
+    Object.assign(S,{own:false,name:v("#n"),emp:"",plate:v("#p"),co:v("#o"),lic:v("#l"),lno:v("#ln")});
+    if(!S.name||!S.plate||!S.co||!S.lic||!S.lno){alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");return}
+    if(/^\d{13}$/.test(S.lno.replace(/[\s-]/g,""))){alert("ช่อง เลขที่ใบขับขี่ ดูเหมือนเป็นเลขบัตรประชาชน กรุณากรอกเลขที่ที่อยู่บนบัตรใบขับขี่แทน");return}
+    if(!$("#cs").checked){alert("กรุณาติ๊กยินยอมการเก็บข้อมูลก่อนเริ่มทำแบบทดสอบ");return}
+    S.consentAt=new Date().toISOString();
+    try{localStorage.setItem("se_info",JSON.stringify({name:S.name,plate:S.plate,co:S.co,lic:S.lic,lno:S.lno}))}catch(e){}
+    S.try=0;saveP("pre");quiz("pre")};
 }
 
 function quiz(kind){
-  const c=S.c,pre=kind=="pre";
+  const c=S.c,pre=kind=="pre";if(!pre)saveP("post");
   S.qs=c.q.map(q=>({t:q[0],ok:q[2+q[1]],o:q.slice(2)}));
   app.innerHTML=`${steps(pre?1:3)}<h2>${pre?"แบบทดสอบก่อนเรียน":"แบบทดสอบหลังเรียน"}</h2>
   <p class="note">${pre?"ยังไม่ต้องกังวลกับคะแนน ใช้เทียบกับผลหลังเรียน":"ต้องตอบถูก "+Math.ceil(c.q.length*(c.pass||CONFIG.passPercent)/100)+" จาก "+c.q.length+" ข้อขึ้นไปจึงจะผ่าน"}</p>`
@@ -354,7 +385,7 @@ function quiz(kind){
     for(let i=0;i<S.qs.length;i++){const r=document.querySelector(`input[name=q${i}]:checked`);
       if(!r){alert("ยังตอบไม่ครบ ข้อที่ "+(i+1));return}
       if(r.value===esc(S.qs[i].ok)||r.value===S.qs[i].ok)s++}
-    pre?(S.pre=s,video()):after(s)};
+    pre?(S.pre=s,S.watched=false,saveP("video"),video()):after(s)};
 }
 
 function video(){
@@ -363,16 +394,17 @@ function video(){
   <div class="vid" id="vid"></div>
   <ul class="pts">${c.pts.map(p=>`<li>${p}</li>`).join("")}</ul>
   <button class="b" id="next" disabled>ทำแบบทดสอบหลังเรียน</button><span class="note" id="hint">ปุ่มจะเปิดเมื่อดูวิดีโอจบ</span>`;
-  const unlock=()=>{$("#next").disabled=false;$("#hint").textContent=""};
+  const unlock=()=>{S.watched=true;saveP("video");$("#next").disabled=false;$("#hint").textContent=""};
   $("#next").onclick=()=>quiz("post");
   if(c.yt){
     $("#vid").innerHTML='<div id="yt"></div>';
-    const mk=()=>new YT.Player("yt",{videoId:c.yt,playerVars:{rel:0},events:{onStateChange:e=>{if(e.data===0)unlock()}}});
+    const mk=()=>new YT.Player("yt",{videoId:c.yt,playerVars:{rel:0,playsinline:1,modestbranding:1},events:{onStateChange:e=>{if(e.data===0)unlock()}}});
     if(window.YT&&YT.Player)mk();else{window.onYouTubeIframeAPIReady=mk;const s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";document.head.appendChild(s)}
   }else{
     $("#vid").innerHTML='<div>โหมดทดลอง: ยังไม่ได้ใส่วิดีโอ<br>ใส่รหัส YouTube ที่ช่อง <b>yt</b> ของหลักสูตรนี้<br><button class="b" id="skip">ข้าม (ทดลอง)</button></div>';
     $("#skip").onclick=unlock;
   }
+  if(S.watched)unlock();
 }
 
 async function post(rec){
@@ -390,13 +422,13 @@ async function flush(){
 async function send(ok){
   if(!CONFIG.hook)return;
   const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8); // กันบันทึกซ้ำถ้าต้องส่งใหม่
-  setPend(pend().concat([{id,time:new Date().toISOString(),result:ok?"ผ่าน":"ไม่ผ่าน",attempt:S.try,no:ok?S.no:"",type:"รถร่วม",name:S.name,emp:"",plate:S.plate,company:S.co,license:S.lic,course:S.c.title,pre:S.pre,post:S.post,total:S.c.q.length}]));
+  setPend(pend().concat([{id,time:new Date().toISOString(),result:ok?"ผ่าน":"ไม่ผ่าน",attempt:S.try,no:ok?S.no:"",type:"รถร่วม",name:S.name,licno:S.lno,consentAt:S.consentAt,plate:S.plate,company:S.co,license:S.lic,course:S.c.title,pre:S.pre,post:S.post,total:S.c.q.length}]));
   const done=await flush(),el=$("#sv");
   if(el)el.textContent=done?"บันทึกผลเรียบร้อยแล้ว":"บันทึกผลไม่สำเร็จ (ตรวจอินเทอร์เน็ต) ระบบจะส่งใหม่เมื่อเปิดเว็บนี้อีกครั้ง";
 }
 
 function after(s){
-  const c=S.c,tot=c.q.length,pct=Math.round(s/tot*100),ok=pct>=(c.pass||CONFIG.passPercent);S.post=s;S.try=(S.try||0)+1;
+  const c=S.c,tot=c.q.length,pct=Math.round(s/tot*100),ok=pct>=(c.pass||CONFIG.passPercent);S.post=s;S.try=(S.try||0)+1;ok?clearP():saveP("video");
   app.innerHTML=`${steps(ok?4:3)}<p class="score ${ok?"pass":"fail"}">${s}/${tot} (${pct}%)</p>
   <h2>${ok?"ผ่านการอบรม":"ยังไม่ผ่านเกณฑ์"}</h2>
   <p>ก่อนเรียน ${S.pre}/${tot} ข้อ → หลังเรียน ${s}/${tot} ข้อ</p>
@@ -440,7 +472,18 @@ async function cert(){
 const loadX=()=>window.XLSX?Promise.resolve():new Promise((ok,no)=>{const e=document.createElement("script");e.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";e.onload=ok;e.onerror=no;document.head.appendChild(e)});
 const fmtD=v=>{const d=new Date(v);return isNaN(d)?v:d.toLocaleString("th-TH")};
 const stt=(m,c)=>{$("#st").textContent=m;$("#st").className="note "+(c||"")};
-let AR=[];const SEL=new Set();
+let AR=[];const SEL=new Set();let DUE=new Map();
+const dueOf=t=>{const n=CONFIG.renewMonths,d=new Date(t);if(!n||isNaN(d))return null;d.setMonth(d.getMonth()+n);
+  const days=(d-Date.now())/864e5;return{d,s:days<0?"เกินกำหนด":days<=30?"ใกล้ครบ":"ปกติ"}};
+const fmtDay=d=>d.toLocaleDateString("th-TH",{dateStyle:"medium"});
+function calcDue(){ // นับเฉพาะรายการผ่านล่าสุดของแต่ละคน/หลักสูตร (AR เรียงใหม่สุดก่อน)
+  DUE=new Map();const seen=new Set();
+  AR.forEach(r=>{if(r[1]!=="ผ่าน")return;const k=[r[5],r[7],r[10]].join("|");if(seen.has(k))return;seen.add(k);
+    const x=dueOf(r[0]);if(x)DUE.set(r[15],x)});
+}
+const dueCell=r=>{if(!CONFIG.renewMonths)return"";const x=DUE.get(r[15]);
+  if(!x)return`<td>${r[1]==="ผ่าน"?"-":""}</td>`;
+  return`<td class="${x.s==="เกินกำหนด"?"due-over":x.s==="ใกล้ครบ"?"due-soon":""}">${esc(fmtDay(x.d))} (${x.s})</td>`};
 function admin(){
   S={};$("#sub").textContent="สำหรับเจ้าหน้าที่";$("main").classList.add("wide");
   app.innerHTML=`<button class="g" id="back">กลับหน้าหลัก</button>
@@ -450,17 +493,19 @@ function admin(){
   <div id="tools" hidden>
    <div class="row"><div><label class="f" for="q">ค้นหา</label><input type="text" id="q" placeholder="ชื่อ ทะเบียน บริษัท"></div>
    <div><label class="f" for="fc">หลักสูตร</label><select id="fc"></select></div>
+   <div id="fsw"><label class="f" for="fs">สถานะอบรมซ้ำ</label><select id="fs"><option value="">ทั้งหมด</option><option>เกินกำหนด</option><option>ใกล้ครบ</option></select></div>
    <div><label class="f" for="fr">ผลสอบ</label><select id="fr"><option value="">ทั้งหมด</option><option>ผ่าน</option><option>ไม่ผ่าน</option></select></div></div>
    <button class="b" id="dl">ดาวน์โหลด Excel (ตามที่กรอง)</button>
    <button class="b" id="del" disabled>ลบที่เลือก</button><button class="b" id="clr">ล้างข้อมูลทั้งหมด</button>
-   <p class="note" id="cnt"></p><div class="tw"><table id="tb"></table></div></div>`;
+   <p class="note" id="sum"></p><p class="note" id="cnt"></p><div class="tw"><table id="tb"></table></div></div>`;
   $("#back").onclick=home;$("#ld").onclick=aLoad;$("#dl").onclick=aDl;$("#del").onclick=aDel;$("#clr").onclick=aClr;
   $("#tb").addEventListener("change",e=>{const t=e.target;
     if(t.id==="all"){aRows().forEach(r=>t.checked?SEL.add(r[15]):SEL.delete(r[15]));aDraw()}
     else if(t.dataset.r){const n=+t.dataset.r;t.checked?SEL.add(n):SEL.delete(n);updDel()}});
   $("#tb").addEventListener("click",e=>{const n=e.target.dataset.c;if(n)aCert(+n)});
   $("#k").addEventListener("keydown",e=>{if(e.key==="Enter")aLoad()});
-  ["#q","#fc","#fr"].forEach(x=>$(x).addEventListener("input",aDraw));
+  if(!CONFIG.renewMonths)$("#fsw").hidden=true;
+  ["#q","#fc","#fr","#fs"].forEach(x=>$(x).addEventListener("input",aDraw));
 }
 async function aLoad(){
   if(!CONFIG.hook){stt("ยังไม่ได้ใส่ URL ของ Apps Script ที่ CONFIG.hook","bad");return}
@@ -471,7 +516,7 @@ async function aLoad(){
     const d=await r.json();
     if(!d.ok){stt("รหัสผ่านไม่ถูกต้อง หรือยังไม่ได้ตั้ง ADMIN_KEY ใน Apps Script","bad");$("#tools").hidden=true}
     else if(d.rows.length<2){stt("ยังไม่มีข้อมูลการสอบ","bad");$("#tools").hidden=true}
-    else{SEL.clear();AR=d.rows.slice(1).map((r,i)=>{const x=r.slice(0,15);while(x.length<15)x.push("");x.push(i+2);return x}).reverse();stt("");
+    else{SEL.clear();AR=d.rows.slice(1).map((r,i)=>{const x=r.slice(0,15);while(x.length<15)x.push("");x.push(i+2);return x}).reverse();calcDue();stt("");
       $("#fc").innerHTML='<option value="">ทั้งหมด</option>'+[...new Set(AR.map(r=>r[10]).filter(Boolean))].map(c=>`<option>${esc(c)}</option>`).join("");
       $("#tools").hidden=false;aDraw()}
   }catch(e){stt("ดึงข้อมูลไม่สำเร็จ ตรวจ URL และการ Deploy ของ Apps Script","bad")}
@@ -479,16 +524,17 @@ async function aLoad(){
 }
 // คอลัมน์ในชีต: 0 เวลา 1 ผล 2 ครั้ง 3 เลขที่ 4 ประเภทรถ 5 ชื่อ 6 รหัส 7 ทะเบียน 8 บริษัท 9 ใบขับขี่ 10 หลักสูตร 11 ก่อน 12 หลัง 13 เต็ม
 function aRows(){
-  const q=$("#q").value.trim().toLowerCase(),c=$("#fc").value,f=$("#fr").value;
-  return AR.filter(r=>(!c||r[10]===c)&&(!f||r[1]===f)&&(!q||[r[3],r[5],r[7],r[8]].join(" ").toLowerCase().includes(q)));
+  const q=$("#q").value.trim().toLowerCase(),c=$("#fc").value,f=$("#fr").value,st=$("#fs").value;
+  return AR.filter(r=>(!c||r[10]===c)&&(!f||r[1]===f)&&(!st||(DUE.get(r[15])||{}).s===st)&&(!q||[r[3],r[5],r[6],r[7],r[8]].join(" ").toLowerCase().includes(q)));
 }
 function updDel(){const b=$("#del");b.disabled=!SEL.size;b.textContent=SEL.size?`ลบที่เลือก (${SEL.size})`:"ลบที่เลือก";
   const rs=aRows(),all=$("#all");if(all)all.checked=rs.length>0&&rs.every(r=>SEL.has(r[15]))}
 function aDraw(){
   const rs=aRows();
+  {const v=[...DUE.values()];$("#sum").textContent=CONFIG.renewMonths?`สถานะอบรมซ้ำ (ทุก ${CONFIG.renewMonths} เดือน): เกินกำหนด ${v.filter(x=>x.s==="เกินกำหนด").length} รายการ · ใกล้ครบภายใน 30 วัน ${v.filter(x=>x.s==="ใกล้ครบ").length} รายการ`:""}
   $("#cnt").textContent=`แสดง ${rs.length} จาก ${AR.length} รายการ (ใหม่สุดอยู่บนสุด)`;
-  $("#tb").innerHTML='<tr><th><input type="checkbox" id="all" aria-label="เลือกทั้งหมดที่แสดง"></th><th>วันที่</th><th>ผล</th><th>ชื่อ-นามสกุล</th><th>ทะเบียนรถ</th><th>บริษัทผู้ประกอบการ</th><th>ใบขับขี่</th><th>หลักสูตร</th><th>ก่อน→หลัง</th><th>เลขที่ใบรับรอง</th><th>ใบรับรอง</th></tr>'
-   +rs.map(r=>`<tr><td><input type="checkbox" data-r="${r[15]}"${SEL.has(r[15])?" checked":""}></td><td>${esc(fmtD(r[0]))}</td><td class="${r[1]==="ผ่าน"?"ap":"af"}">${esc(r[1])}</td><td>${esc(r[5])}</td><td>${esc(r[7])}</td><td>${esc(r[8])}</td><td>${esc(r[9])}</td><td>${esc(r[10])}</td><td>${esc(r[11])}→${esc(r[12])}/${esc(r[13])}</td><td>${esc(r[3])}</td><td>${r[1]==="ผ่าน"?`<button class="g" data-c="${r[15]}">ดาวน์โหลด</button>`:""}</td></tr>`).join("");
+  $("#tb").innerHTML='<tr><th><input type="checkbox" id="all" aria-label="เลือกทั้งหมดที่แสดง"></th><th>วันที่</th><th>ผล</th><th>ชื่อ-นามสกุล</th><th>ทะเบียนรถ</th><th>บริษัทผู้ประกอบการ</th><th>ใบขับขี่</th><th>เลขที่ใบขับขี่</th><th>หลักสูตร</th><th>ก่อน→หลัง</th><th>เลขที่ใบรับรอง</th><th>ใบรับรอง</th>'+(CONFIG.renewMonths?'<th>ครบกำหนดอบรมซ้ำ</th>':'')+'</tr>'
+   +rs.map(r=>`<tr><td><input type="checkbox" data-r="${r[15]}"${SEL.has(r[15])?" checked":""}></td><td>${esc(fmtD(r[0]))}</td><td class="${r[1]==="ผ่าน"?"ap":"af"}">${esc(r[1])}</td><td>${esc(r[5])}</td><td>${esc(r[7])}</td><td>${esc(r[8])}</td><td>${esc(r[9])}</td><td>${esc(r[6])}</td><td>${esc(r[10])}</td><td>${esc(r[11])}→${esc(r[12])}/${esc(r[13])}</td><td>${esc(r[3])}</td><td>${r[1]==="ผ่าน"?`<button class="g" data-c="${r[15]}">ดาวน์โหลด</button>`:""}</td>${dueCell(r)}</tr>`).join("");
   updDel();
 }
 async function aCert(row){
@@ -520,12 +566,12 @@ async function aDl(){
   try{await loadX()}catch(e){alert("โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่");return}
   const chrono=aRows().slice().reverse(),m=new Map();
   chrono.filter(r=>r[1]==="ผ่าน").forEach(r=>m.set([r[5],r[7],r[10]].join("|"),r));
-  const pass=[["ชื่อ-นามสกุล","ทะเบียนรถ","บริษัทผู้ประกอบการ","ใบขับขี่","หลักสูตร","คะแนนหลังเรียน","เต็ม","เลขที่ใบรับรอง","วันที่ผ่าน"]]
-   .concat([...m.values()].map(r=>[r[5],r[7],r[8],r[9],r[10],r[12],r[13],r[3],fmtD(r[0])]));
-  const log=[["เวลา","ผลสอบ","ครั้งที่สอบ","เลขที่ใบรับรอง","ชื่อ-นามสกุล","ทะเบียนรถ","บริษัทผู้ประกอบการ","ใบขับขี่","หลักสูตร","ก่อนเรียน","หลังเรียน","เต็ม"]]
-   .concat(chrono.map(r=>[fmtD(r[0]),r[1],r[2],r[3],r[5],r[7],r[8],r[9],r[10],r[11],r[12],r[13]]));
+  const pass=[["ชื่อ-นามสกุล","ทะเบียนรถ","บริษัทผู้ประกอบการ","ใบขับขี่","เลขที่ใบขับขี่","หลักสูตร","คะแนนหลังเรียน","เต็ม","เลขที่ใบรับรอง","วันที่ผ่าน"].concat(CONFIG.renewMonths?["ครบกำหนดอบรมซ้ำ","สถานะ"]:[])]
+   .concat([...m.values()].map(r=>{const x=dueOf(r[0]);return[r[5],r[7],r[8],r[9],r[6],r[10],r[12],r[13],r[3],fmtD(r[0])].concat(CONFIG.renewMonths?(x?[fmtDay(x.d),x.s]:["",""]):[])}));
+  const log=[["เวลา","ผลสอบ","ครั้งที่สอบ","เลขที่ใบรับรอง","ชื่อ-นามสกุล","ทะเบียนรถ","บริษัทผู้ประกอบการ","ใบขับขี่","เลขที่ใบขับขี่","หลักสูตร","ก่อนเรียน","หลังเรียน","เต็ม"]]
+   .concat(chrono.map(r=>[fmtD(r[0]),r[1],r[2],r[3],r[5],r[7],r[8],r[9],r[6],r[10],r[11],r[12],r[13]]));
   const wb=XLSX.utils.book_new();
-  [[pass,"ผ่านการอบรม",[26,14,28,10,30,14,6,22,22]],[log,"ทุกครั้งที่สอบ",[22,10,10,22,26,14,28,10,30,12,12,10]]].forEach(([a,n,w])=>{
+  [[pass,"ผ่านการอบรม",[26,14,28,10,16,30,14,6,22,22].concat(CONFIG.renewMonths?[20,12]:[])],[log,"ทุกครั้งที่สอบ",[22,10,10,22,26,14,28,10,16,30,12,12,10]]].forEach(([a,n,w])=>{
     const ws=XLSX.utils.aoa_to_sheet(a);ws["!cols"]=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,n)});
   XLSX.writeFile(wb,"รายชื่อผู้อบรม-"+new Date().toISOString().slice(0,10)+".xlsx");
 }
